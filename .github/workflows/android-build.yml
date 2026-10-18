@@ -2,6 +2,13 @@ name: Build SmartKidsAI APK
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'SmartKidsAI.zip'
+      - '.github/workflows/android-build.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -19,19 +26,35 @@ jobs:
 
       - name: Extract Android project
         run: |
+          mkdir -p extracted
           unzip -o SmartKidsAI.zip -d extracted
 
-      - name: Build APK
+      - name: Find Android project
+        id: project
         run: |
-          cd extracted
-          PROJECT_DIR=$(find . -name settings.gradle.kts -printf '%h\n' | head -n 1)
+          PROJECT_DIR=$(find extracted -type f \
+            \( -name settings.gradle -o -name settings.gradle.kts \) \
+            -printf '%h\n' | head -n 1)
+
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found in ZIP"
+            echo "ERROR: Android project not found in ZIP"
             exit 1
           fi
-          cd "$PROJECT_DIR"
-          gradle --version
-          gradle assembleDebug
+
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Android project found at: $PROJECT_DIR"
+
+      - name: Build Debug APK
+        run: |
+          cd "${{ steps.project.outputs.dir }}"
+
+          if [ ! -f "gradlew" ]; then
+            echo "ERROR: Gradle wrapper (gradlew) is missing"
+            exit 1
+          fi
+
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         if: success()
@@ -39,3 +62,5 @@ jobs:
         with:
           name: SmartKidsAI-APK
           path: extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
