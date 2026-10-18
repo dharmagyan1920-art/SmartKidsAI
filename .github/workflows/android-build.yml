@@ -1,0 +1,41 @@
+name: Build SmartKidsAI APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract Android project
+        run: |
+          unzip -o SmartKidsAI.zip -d extracted
+
+      - name: Build APK
+        run: |
+          cd extracted
+          PROJECT_DIR=$(find . -name settings.gradle.kts -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found in ZIP"
+            exit 1
+          fi
+          cd "$PROJECT_DIR"
+          gradle --version
+          gradle assembleDebug
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartKidsAI-APK
+          path: extracted/**/build/outputs/apk/debug/*.apk
